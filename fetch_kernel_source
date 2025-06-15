@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+if [ $# -ne 1 ]; then
+    echo "Usage: $(basename $0) VERSION"
+    exit 1
+fi
+
+VERSION="$1"
+
+# Now do the work to reduce the linux kernel archive
+wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${VERSION}.tar.xz
+tar -xf linux-${VERSION}.tar.xz linux-${VERSION}/drivers/net/ethernet/aquantia/atlantic
+tar -Jcf linux-${VERSION}-atlantic.tar.xz linux-${VERSION}/
+
+# Clean up intermediate files
+rm -f linux-${VERSION}.tar.xz
+rm -rf linux-${VERSION}
