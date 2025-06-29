@@ -1,37 +1,58 @@
-From 3a01ee5f80233feb9bce2a39526a59e8f2d9f6d5 Mon Sep 17 00:00:00 2001
+From fa81464bad1af4d92777b38e42ef55c780296c66 Mon Sep 17 00:00:00 2001
 From: Eric Work <work.eric@gmail.com>
 Date: Sat, 14 Jun 2025 18:48:08 -0700
-Subject: [PATCH] net: atlantic: add set_power to fw_ops for atl2 to fix wol
+Subject: [PATCH net-next] net: atlantic: add set_power to fw_ops for atl2 to
+ fix wol
 
-An Aquantia AQC113(C) when using ATL2FW doesn't properly prepare the NIC
-for enabling wake-on-lan. The FW operation `set_power` was only
-implemented for `hw_atl` and not `hw_atl2`. Here we implement the
-`set_power` functionality for `hw_atl2`.
+Aquantia AQC113(C) using ATL2FW doesn't properly prepare the NIC for
+enabling wake-on-lan. The FW operation `set_power` was only implemented
+for `hw_atl` and not `hw_atl2`. Implement the `set_power` functionality
+for `hw_atl2`.
 
-This has been tested with both an AQC113 and an AQC113C device. With
-these changes you can now shutdown the system and wake from S5 using
-magic packets. Previously the NIC was powered off when entering S5.
-Previously if the NIC was configured for WOL by the Windows driver,
-loading the atlantic driver would again disable WOL.
+Tested with both AQC113 and AQC113C devices. Confirmed you can shutdown
+the system and wake from S5 using magic packets. NIC was previously
+powered off when entering S5. If the NIC was configured for WOL by the
+Windows driver, loading the atlantic driver would disable WOL.
 
-This commit cherry-picks partial changes from commit,
-https://github.com/Aquantia/AQtion/commit/37bd5ccd73ad4baff488c1d728eb8a819a7eef1f
+Partially cherry-picks changes from commit,
+https://github.com/Aquantia/AQtion/commit/37bd5cc
 
-Attributing the original authors from Marvell for the referenced commit.
+Attributing original authors from Marvell for the referenced commit.
 
+Closes: https://github.com/Aquantia/AQtion/issues/70
+Co-developed-by: Igor Russkikh <irusskikh@marvell.com>
+Co-developed-by: Mark Starovoitov <mstarovoitov@marvell.com>
+Co-developed-by: Dmitry Bogdanov <dbogdanov@marvell.com>
+Co-developed-by: Pavel Belous <pbelous@marvell.com>
+Co-developed-by: Nikita Danilov <ndanilov@marvell.com>
 Signed-off-by: Eric Work <work.eric@gmail.com>
-Co-authored-by: Igor Russkikh <irusskikh@marvell.com>
-Co-authored-by: Mark Starovoitov <mstarovoitov@marvell.com>
-Co-authored-by: Dmitry Bogdanov <dbogdanov@marvell.com>
-Co-authored-by: Pavel Belous <pbelous@marvell.com>
-Co-authored-by: Nikita Danilov <ndanilov@marvell.com>
 ---
+
+Notes:
+    The changes within this patch were originally written by developers from
+    Marvell (formerly Aquantia) as mentioned in the patch trailer using
+    Co-developed-by. Adding the `set_power` function for ATL2FW was one of
+    many changes that were released as part of the v2.4.7 update for the
+    vendor atlantic driver. I have only copied the functions necessary to
+    enable WoL and modified the required functions to work with the upstream
+    Linux kernel and followed netdev conventions (reverse xmas).
+    
+    The latest driver from Marvell can be obtained from the following page,
+    https://www.marvell.com/support/downloads.html, resulting in the link,
+    https://www.marvell.com/content/dam/marvell/en/drivers/07-18-24_Marvell_Linux_2.5.12.zip
+    
+    An earlier version of the driver was published by Aquantia on GitHub at
+    https://github.com/aquantia/AQtion. The community has been using this
+    GitHub project to discuss issues with the atlantic driver (even those
+    not present in the GitHub repo), including the lack of WoL support in
+    the upstream Linux kernel.
+
  .../net/ethernet/aquantia/atlantic/aq_hw.h    |  2 +
  .../atlantic/hw_atl2/hw_atl2_utils_fw.c       | 39 +++++++++++++++++++
  2 files changed, 41 insertions(+)
 
 diff --git a/drivers/net/ethernet/aquantia/atlantic/aq_hw.h b/drivers/net/ethernet/aquantia/atlantic/aq_hw.h
-index 42c0efc1b45581..4e66fd9b2ab1dc 100644
+index 42c0efc1b455..4e66fd9b2ab1 100644
 --- a/drivers/net/ethernet/aquantia/atlantic/aq_hw.h
 +++ b/drivers/net/ethernet/aquantia/atlantic/aq_hw.h
 @@ -113,6 +113,8 @@ struct aq_stats_s {
@@ -44,7 +65,7 @@ index 42c0efc1b45581..4e66fd9b2ab1dc 100644
  #define AQ_HW_FLAG_STOPPING    0x00000008U
  #define AQ_HW_FLAG_RESETTING   0x00000010U
 diff --git a/drivers/net/ethernet/aquantia/atlantic/hw_atl2/hw_atl2_utils_fw.c b/drivers/net/ethernet/aquantia/atlantic/hw_atl2/hw_atl2_utils_fw.c
-index 52e2070a4a2f0c..6a2dbb65201572 100644
+index 52e2070a4a2f..7370e3f76b62 100644
 --- a/drivers/net/ethernet/aquantia/atlantic/hw_atl2/hw_atl2_utils_fw.c
 +++ b/drivers/net/ethernet/aquantia/atlantic/hw_atl2/hw_atl2_utils_fw.c
 @@ -462,6 +462,44 @@ static int aq_a2_fw_get_mac_temp(struct aq_hw_s *self, int *temp)
@@ -53,8 +74,8 @@ index 52e2070a4a2f0c..6a2dbb65201572 100644
  
 +static int aq_a2_fw_set_wol_params(struct aq_hw_s *self, const u8 *mac, u32 wol)
 +{
-+	struct link_control_s link_control;
 +	struct mac_address_aligned_s mac_address;
++	struct link_control_s link_control;
 +	struct wake_on_lan_s wake_on_lan;
 +
 +	memcpy(mac_address.aligned.mac_address, mac, ETH_ALEN);
@@ -80,8 +101,8 @@ index 52e2070a4a2f0c..6a2dbb65201572 100644
 +static int aq_a2_fw_set_power(struct aq_hw_s *self, unsigned int power_state,
 +			      const u8 *mac)
 +{
-+	int err = 0;
 +	u32 wol = self->aq_nic_cfg->wol;
++	int err = 0;
 +
 +	if (wol)
 +		err = aq_a2_fw_set_wol_params(self, mac, wol);
@@ -100,3 +121,6 @@ index 52e2070a4a2f0c..6a2dbb65201572 100644
  	.get_mac_temp       = aq_a2_fw_get_mac_temp,
  	.get_phy_temp       = aq_a2_fw_get_phy_temp,
  	.set_eee_rate       = aq_a2_fw_set_eee_rate,
+-- 
+2.49.0
+

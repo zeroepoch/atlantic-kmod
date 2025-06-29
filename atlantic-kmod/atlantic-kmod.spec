@@ -4,7 +4,7 @@
 %global debug_package %{nil}
 
 Name:       atlantic-kmod
-Version:    6.14.11
+Version:    6.15.4
 Release:    1%{?dist}
 Summary:    Kernel driver for Aquantia AQtion with WOL support
 License:    GPL-2.0-only
@@ -54,5 +54,8 @@ done
 %{?akmod_install}
 
 %changelog
+* Sun Jun 29 2025 Eric Work <work.eric@gmail.com> - 6.15.4-1
+- Update to 6.15.4
+
 * Sat Jun 14 2025 Eric Work <work.eric@gmail.com> - 6.14.11-1
 - First build.
